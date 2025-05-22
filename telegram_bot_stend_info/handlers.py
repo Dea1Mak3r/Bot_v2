@@ -5,9 +5,10 @@ from aiogram import Router
 from aiogram import F
 from bot_keyboard import main_keyboard
 import requests
-import json
+import os
 
 router = Router()
+API_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
 
 
 @router.message(CommandStart())
@@ -25,7 +26,7 @@ async def help_command(message: Message):
 
 @router.message(F.text == 'Статус')
 async def get_status_command(message: Message):
-    response = requests.get('http://127.0.0.1:8000/status')
+    response = requests.get(f"{API_URL}/status")
     if response.status_code == 200:
         data = response.json()
         # status_messages = []
@@ -59,11 +60,11 @@ async def get_status_command(message: Message):
 
 @router.message(F.text == 'Версия')
 async def get_version_command(message: Message):
-    response = requests.get('http://127.0.0.1:8000/version')
+    response = requests.get(f"{API_URL}/version")
     if response.status_code == 200:
         await message.answer(f"Версия стенда: {response.text}")
     else:
-        await message.add_answer(f"Ошибка при получении статуса. Код ответа: {response.status_code}")
+        await message.answer(f"Ошибка при получении версии. Код ответа: {response.status_code}")
     #     data = response.json()
     #     version_messages = []
     #     for stand, info in data.items():
