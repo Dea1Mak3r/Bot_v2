@@ -9,5 +9,5 @@ CREATE TABLE status (
 CREATE TABLE version (
     id SERIAL PRIMARY KEY,
     stand VARCHAR(50) NOT NULL,
-    version VARCHAR(10) NOT NULL
+    version VARCHAR(50) NOT NULL
 );

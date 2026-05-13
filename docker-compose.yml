@@ -1,13 +1,13 @@
+name: monitoring_system
 version: '3.8'
 services:
   db:
     image: postgres:15
+    container_name: postgres_db
     restart: always
     env_file: .env
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      - TZ=Europe/Moscow
     volumes:
       - db_data:/var/lib/postgresql/data
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -21,15 +21,14 @@ services:
       - "5432:5432"
 
   api:
+    container_name: api
     build:
       context: .
       dockerfile: ./API/Dockerfile
     command: uvicorn api:app --host 0.0.0.0 --port 8000
     env_file: .env
     environment:
-      DB_NAME: ${POSTGRES_DB}
-      DB_USER: ${POSTGRES_USER}
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      - TZ=Europe/Moscow
     ports:
       - "8000:8000"
     depends_on:
@@ -39,21 +38,36 @@ services:
       - appnet
 
   bot:
+    container_name: tg_bot
     build:
-      context: ./telegram_bot_stend_info
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./telegram_bot_stand_info/Dockerfile
     env_file: .env
     environment:
-      # Для asyncpg в bot_run.py
-      DB_NAME: ${POSTGRES_DB}
-      DB_USER: ${POSTGRES_USER}
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      - TZ=Europe/Moscow
     depends_on:
       api:
         condition: service_started
     networks:
       - appnet
 
+  web_interface:
+    container_name: web_interface
+    build:
+      context: .
+      dockerfile: ./web_interface/Dockerfile
+    environment:
+      - TZ=Europe/Moscow
+    ports:
+      - "8502:8502"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    env_file: .env
+    depends_on:
+      api:
+        condition: service_started
+    networks:
+      - appnet
 volumes:
   db_data:
 

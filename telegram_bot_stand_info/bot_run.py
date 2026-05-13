@@ -1,12 +1,12 @@
 import asyncio
-import os
 import asyncpg
 
 from aiogram import Bot, Dispatcher
 from handlers import router
+from config import settings
 
-BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
-API_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
+BOT_TOKEN = settings.TELEGRAM_TOKEN
+API_URL = settings.API_URL
 
 class Database:
     def __init__(self):
@@ -14,10 +14,10 @@ class Database:
 
     async def connect(self):
         self.pool = await asyncpg.create_pool(
-            host=os.getenv('DB_HOST'),
-            database=os.getenv('DB_NAME'),
-            user=os.getenv('DB_USER'),
-            password=os.getenv('DB_PASSWORD')
+            host=settings.DB_HOST,
+            database=settings.POSTGRES_DB,
+            user=settings.POSTGRES_USER,
+            password=settings.POSTGRES_PASSWORD
         )
 
     async def log_status(self, status_code, status_desc, stand):
