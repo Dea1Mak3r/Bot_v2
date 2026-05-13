@@ -1,155 +1,138 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from datetime import datetime
 import httpx
+from sqlalchemy.orm import Session
+from database import get_db, engine, Base
+from models import Status, Version
+from config import settings
+
 
 app = FastAPI()
 
-api_versions = dict()
+login = settings.login
+password = settings.password
 
-api_dict = {'DEV': 'https://ao-gpn-dev.platform.gf/api/autoorder/version', 'TEST': 'https://ao-gpn-test.platform.gf/api/autoorder/version', 'CALC': 'https://autoorder-calculate.platform.gf/api/autoorder/version'}
-
-json_data = {
-    'userName': 'kodintsev_roman',
-    'password': '5kwSbxpygiM#',
+STANDS = {
+    "lenta": {"login_url": settings.LENTA_LOGIN_URL, "info_url": settings.LENTA_INFO_URL, "name": "LENTA"},
+    "mars": {"login_url": settings.MARS_LOGIN_URL, "info_url": settings.MARS_INFO_URL, "name": "MARS"}
 }
 
-headers = {
-    'accept': 'application/json, text/plain, */*',
-    'accept-language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
-    'cache-control': 'no-cache',
-    'content-type': 'application/json',
-    'origin': 'https://ao-gpn-dev.platform.gf',
-    'pragma': 'no-cache',
-    'priority': 'u=1, i',
-    'referer': 'https://ao-gpn-dev.platform.gf/authentication/login',
-    'sec-ch-ua': '"Chromium";v="128", "Not;A=Brand";v="24", "Opera";v="114"',
-    'sec-ch-ua-mobile': '?0',
-    'sec-ch-ua-platform': '"Windows"',
-    'sec-fetch-dest': 'empty',
-    'sec-fetch-mode': 'cors',
-    'sec-fetch-site': 'same-origin',
-    'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 OPR/114.0.0.0 (Edition Yx 05)',
-}
 
-# headers = {
-#     'accept': 'application/json, text/plain, */*',
-#     'accept-encoding': 'gzip, deflate, br, zstd',
-#     'accept-language': 'ru-RU,ru;q=0.9',
-#     'cache-control': 'no-cache',
-#     'content-length': '639',
-#     'content-type': 'application/x-www-form-urlencoded',
-#     'origin': 'https://gfc.dev.platform.lenta.tech',
-#     'pragma': 'no-cache',
-#     'priority': 'u=1, i',
-#     'referer': 'https://gfc.dev.platform.lenta.tech/authentication/login-callback',
-#     'sec-ch-ua': '"Not(A:Brand";v="99", "Opera";v="118", "Chromium";v="133"',
-#     'sec-ch-ua-mobile': '?0',
-#     'sec-ch-ua-platform': "Windows",
-#     'sec-fetch-dest': 'empty',
-#     'sec-fetch-mode': 'cors',
-#     'sec-fetch-site': 'same-origin',
-#     'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36 OPR/118.0.0.0 (Edition Yx 05)'
-# }
 
 @app.get("/")
 def get_home():
     return {"Hello": "World"}
 
-# @app.get("/status")
-# def get_status():
-#
-#     with httpx.Client(verify=False) as client:
-#         response = client.get(
-#             'https://autoorder-calculate.platform.gf/authentication/login',
-#             headers=headers,
-#             auth=('kodintsev_roman', '5kwSbxpygiM#'),
-#             follow_redirects=True
-#         )
-#
-#         calcData = {"stand": "CALC-стенд", "status": response.status_code,
-#                    "timestamp": datetime.now().strftime("%H:%M:%S"), "date": datetime.now().strftime("%d-%m-%Y"),
-#                    "description": {True: "Сервис доступен!", False: "Ошибка! Сервис не доступен!"}[
-#                        response.status_code == 200]}
-#
-#         response = client.get(
-#             'https://ao-gpn-dev.platform.gf/authentication/login',
-#             headers=headers,
-#             auth=('kodintsev_roman', '5kwSbxpygiM#'),
-#             follow_redirects=True
-#         )
-#
-#         devData = {"stand": "DEV-стенд", "status": response.status_code,
-#                    "timestamp": datetime.now().strftime("%H:%M:%S"), "date": datetime.now().strftime("%d-%m-%Y"),
-#                    "description":{True: "Сервис доступен!", False: "Ошибка! Сервис не доступен!"} [response.status_code==200]}
-#
-#         response = client.get(
-#                     'https://ao-gpn-test.platform.gf/authentication/login',
-#                     headers=headers,
-#                     auth=('kodintsev_roman', '5kwSbxpygiM#'),
-#                     follow_redirects=True
-#                 )
-#
-#         testData = {"stand": "TEST-стенд", "status": response.status_code,
-#                    "timestamp": datetime.now().strftime("%H:%M:%S"), "date": datetime.now().strftime("%d-%m-%Y"),
-#                    "description":{True: "Сервис доступен!", False: "Ошибка! Сервис не доступен!"} [response.status_code==200]}
-#
-#     return calcData, devData, testData
 
-@app.get("/status")
-def get_status():
 
-    with httpx.Client(verify=False) as client:
-        response = client.get(
-            'http://promo-lenta-test.k8s.gf/authentication/login',
-            headers=headers,
-            auth=('kodintsev_roman', '5kwSbxpygiM#12'),
-            follow_redirects=True
-        )
+@app.get("/status/{stand_name}")
+async def get_status(stand_name: str, db: Session = Depends(get_db)):
+    # Проверяем, знаем ли мы такой стенд
+    stand_name = stand_name.lower()
+    if stand_name not in STANDS:
+        raise HTTPException(status_code=404, detail="Стенд не найден")
 
-        testData = {"stand": "TEST-стенд", "status": response.status_code,
-                   "timestamp": datetime.now().strftime("%H:%M:%S"), "date": datetime.now().strftime("%d-%m-%Y"),
-                   "description": {True: "Сервис доступен!", False: "Ошибка! Сервис не доступен!"}[
-                       response.status_code == 200]}
+    config = STANDS[stand_name]
 
-    return testData
+    testData = {"stand": config["name"],
+                "status": 0,
+                "timestamp": datetime.now().strftime("%H:%M:%S"),
+                "date": datetime.now().strftime("%d-%m-%Y"),
+                "description": ''}
 
-"""Для трёх стендов"""
-# @app.get("/version")
-# def get_version():
-#
-#     for stand_name, stand_link in api_dict.items():
-#
-#         with httpx.Client(verify=False) as client:
-#             response = client.get(
-#                 url=stand_link,
-#                 headers=headers,
-#                 follow_redirects=True
-#             )
-#
-#         val = response.text.split(': ')[1]
-#         date, time = val.split(' ')
-#         api_versions[stand_name] = [date, time]
-#         print(api_versions)
-#
-#     return api_versions
+    async with httpx.AsyncClient(verify=False) as client:
+        try:
+            response = await client.get(
+                config["login_url"],
+                auth=(login, password),
+                follow_redirects=True,
+                timeout=10
+            )
+            response.raise_for_status()
 
-"""Для одного стенда"""
-@app.get("/version")
-def get_version():
+            if response.status_code == 200:
+                testData["status"] = 200
+                testData["description"] = "Сервис доступен!"
+                # return testData
+            else:
+                testData["status"] = response.status_code
+                testData["description"] = f"Ошибка! Код: {response.status_code}"
+                # return testData
 
-    with httpx.Client(verify=False) as client:
-        response = client.get(
-            url="http://promo-lenta-test.k8s.gf/api/v1.0/version",
-            headers=headers,
-            follow_redirects=True
-        )
-    stand_version = response.json()['version']
-    return stand_version
 
-    """Для трёх стендов"""
-    # val = response.text.split(': ')[1]
-    # date, time = val.split(' ')
-    # api_versions[stand_name] = [date, time]
-    # print(api_versions)
+        except httpx.RequestError as exc:
+            testData["status"] = 500
+            testData["description"] = f"Ошибка сети при запросе к {exc.request.url!r}"
 
-    # return api_versions
+        except Exception as e:
+            testData["status"] = 0
+            testData["description"] = f"Критическая ошибка: {str(e)}"
+
+        finally:
+            db_item = Status(
+                status_code=testData["status"],
+                status_desc=testData["description"],
+                timestamp=datetime.now(),
+                stand=config["name"],
+            )
+            db.add(db_item)
+            db.commit()
+            db.refresh(db_item)
+
+            return testData
+
+
+@app.get("/version/{stand_name}")
+async def get_version(stand_name: str, db: Session = Depends(get_db)):
+    stand_name = stand_name.lower()
+    if stand_name not in STANDS:
+        raise HTTPException(status_code=404, detail="Стенд не найден")
+
+    config = STANDS[stand_name]
+
+    async with httpx.AsyncClient(verify=False) as client:
+        try:
+            response = await client.get(
+                url=config["info_url"],
+                timeout=10
+            )
+            response.raise_for_status()
+            stand_version = response.json().get('version', 'unknown')
+        except Exception as e:
+            stand_version = "Error"
+
+    db_item = Version(
+        stand = config["name"],  # Тут можно динамически взять из URL
+        version = stand_version
+                       )
+    db.add(db_item)
+    db.commit()
+    db.refresh(db_item)
+
+    return {"stand": config["name"], "version": stand_version}
+
+
+# История статусов для вывода на фронте
+@app.get("/history/status")
+async def get_status_history(limit: int = 1000, db: Session = Depends(get_db)):
+    # Забираем последние N записей, сортируя по ID или времени
+    history = db.query(Status).order_by(Status.id.asc()).limit(limit).all()
+    return history
+
+# Аккумулируем историю запросов версий
+@app.get("/history/version")
+async def get_version_history(limit: int = 1000, db: Session = Depends(get_db)):
+    history = db.query(Version).order_by(Version.id.desc()).limit(limit).all()
+    return history
+
+# Отправка результатов тестирования Newman в бота
+async def send_telegram_report(message: str):
+    """Отправка сообщения в телеграм через API бота"""
+    url = f"https://api.telegram.org/bot{settings.TELEGRAM_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": settings.ADMIN_CHAT_ID, # ID чата, куда слать отчет
+        "text": message,
+        "parse_mode": "Markdown"
+    }
+    async with httpx.AsyncClient() as client:
+        await client.post(url, json=payload)
